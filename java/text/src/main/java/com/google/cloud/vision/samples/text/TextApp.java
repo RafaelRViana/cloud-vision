@@ -37,10 +37,12 @@ import com.google.common.collect.Lists;
 
 import opennlp.tools.stemmer.snowball.SnowballStemmer;
 import opennlp.tools.tokenize.TokenizerME;
-
+import opennlp.tools.tokenize.TokenizerModel;
 import redis.clients.jedis.JedisPool;
 
 import java.io.Console;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,14 +64,14 @@ public class TextApp {
    * Be sure to specify the name of your application. If the application name is {@code null} or
    * blank, the application will log a warning. Suggested format is "MyCompany-ProductName/1.0".
    */
-  private static final String APPLICATION_NAME = "Google-VisionTextSample/1.0";
+  private static final String APPLICATION_NAME = "super-do-dia/1.0";
 
   /**
    * Connects to the Vision API using Application Default Credentials.
    */
   public static Vision getVisionService() throws IOException, GeneralSecurityException {
-    GoogleCredential credential =
-        GoogleCredential.getApplicationDefault().createScoped(VisionScopes.all());
+    //GoogleCredential credential = GoogleCredential.getApplicationDefault().createScoped(VisionScopes.all());
+    GoogleCredential credential = GoogleCredential.fromStream(new FileInputStream(new File("/Users/rafaelviana/Downloads/google-credentials"))).createScoped(VisionScopes.all());
     JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
     return new Vision.Builder(GoogleNetHttpTransport.newTrustedTransport(), jsonFactory, credential)
             .setApplicationName(APPLICATION_NAME)
@@ -80,7 +82,9 @@ public class TextApp {
    * Annotates an image using the Vision API.
    */
   public static void main(String[] args) throws IOException, GeneralSecurityException {
-    if (args.length > 1) {
+	  args = new String[]{"/Users/rafaelviana/Desktop/cupons"};
+    
+	  if (args.length > 1) {
       System.err.println("Usage:");
       System.err.printf(
           "\tjava %s inputDirectory\n",
@@ -93,8 +97,9 @@ public class TextApp {
       Index index =
           new Index(
               new TokenizerME(Index.getEnglishTokenizerMeModel()),
-              new SnowballStemmer(SnowballStemmer.ALGORITHM.ENGLISH),
+              new SnowballStemmer(SnowballStemmer.ALGORITHM.PORTUGUESE),
               pool);
+      	
       TextApp app = new TextApp(TextApp.getVisionService(), index);
 
       if (args.length == 0) {
@@ -171,17 +176,20 @@ public class TextApp {
     ImmutableList.Builder<AnnotateImageRequest> requests = ImmutableList.builder();
     try {
       for (Path path : paths) {
-        byte[] data;
-        data = Files.readAllBytes(path);
-        requests.add(
-            new AnnotateImageRequest()
-                .setImage(new Image().encodeContent(data))
-                .setFeatures(ImmutableList.of(
-                    new Feature()
-                        .setType("TEXT_DETECTION")
-                        .setMaxResults(MAX_RESULTS))));
+    	  if(!path.getFileName().equals(".DS_Store")) {
+    		  byte[] data;
+    	        data = Files.readAllBytes(path);
+    	        requests.add(
+    	            new AnnotateImageRequest()
+    	                .setImage(new Image().encodeContent(data))
+    	                .setFeatures(ImmutableList.of(
+    	                    new Feature()
+    	                        .setType("TEXT_DETECTION")
+    	                        .setMaxResults(MAX_RESULTS))));
+    	  }
       }
-
+      
+      System.out.println("1");
       Vision.Images.Annotate annotate =
           vision.images()
               .annotate(new BatchAnnotateImagesRequest().setRequests(requests.build()));
@@ -190,6 +198,7 @@ public class TextApp {
       BatchAnnotateImagesResponse batchResponse = annotate.execute();
       assert batchResponse.getResponses().size() == paths.size();
 
+      System.out.println("2");
       ImmutableList.Builder<ImageText> output = ImmutableList.builder();
       for (int i = 0; i < paths.size(); i++) {
         Path path = paths.get(i);
@@ -204,8 +213,11 @@ public class TextApp {
                 .error(response.getError())
                 .build());
       }
+      System.out.println("3");
       return output.build();
     } catch (IOException ex) {
+    	ex.printStackTrace();
+    	
       // Got an exception, which means the whole batch had an error.
       ImmutableList.Builder<ImageText> output = ImmutableList.builder();
       for (Path path : paths) {
@@ -224,6 +236,7 @@ public class TextApp {
    * Checks that there was not an error processing an {@code image}.
    */
   public boolean successfullyDetectedText(ImageText image) {
+	System.out.println("Image.error() => " + image.error());
     if (image.error() != null) {
       System.out.printf("Error reading %s:\n%s\n", image.path(), image.error().getMessage());
       return false;
@@ -238,6 +251,7 @@ public class TextApp {
     String document = "";
     for (EntityAnnotation text : image.textAnnotations()) {
       document += text.getDescription();
+      System.out.println("Text.getDescription() => " + text.getDescription());
     }
     if (document.equals("")) {
       System.out.printf("%s had no discernible text.\n", image.path());

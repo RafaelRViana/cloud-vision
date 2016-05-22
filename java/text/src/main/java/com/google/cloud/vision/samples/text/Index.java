@@ -47,7 +47,7 @@ public class Index {
    * Parses tokenizer data and creates a tokenizer.
    */
   public static TokenizerModel getEnglishTokenizerMeModel() throws IOException {
-    try (InputStream modelIn = new FileInputStream("en-token.bin")) {
+    try (InputStream modelIn = new FileInputStream("pt-token.bin")) {
       return new TokenizerModel(modelIn);
     }
   }
